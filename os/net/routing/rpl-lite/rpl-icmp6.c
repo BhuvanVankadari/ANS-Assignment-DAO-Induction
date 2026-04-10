@@ -68,6 +68,15 @@ static void dis_input(void);
 static void dio_input(void);
 static void dao_input(void);
 
+/* Optional callback invoked at the root on each accepted DAO. */
+static rpl_dao_input_callback_t dao_input_callback = NULL;
+
+void
+rpl_icmp6_set_dao_callback(rpl_dao_input_callback_t cb)
+{
+  dao_input_callback = cb;
+}
+
 /*---------------------------------------------------------------------------*/
 /* Initialize RPL ICMPv6 message handlers */
 UIP_ICMP6_HANDLER(dis_handler, ICMP6_RPL, RPL_CODE_DIS, dis_input);
@@ -491,6 +500,7 @@ dao_input(void)
   }
 
   uip_ipaddr_copy(&from, &UIP_IP_BUF->srcipaddr);
+
   memset(&dao.parent_addr, 0, 16);
 
   buffer = UIP_ICMP_PAYLOAD;
@@ -583,6 +593,10 @@ dao_input(void)
   LOG_INFO_(", prefix length %u, parent ", dao.prefixlen);
   LOG_INFO_6ADDR(&dao.parent_addr);
   LOG_INFO_(" \n");
+
+  if(rpl_dag_root_is_root() && dao_input_callback != NULL) {
+    dao_input_callback(&from, (uint8_t)dao.sequence);
+  }
 
   rpl_process_dao(&from, &dao);
 

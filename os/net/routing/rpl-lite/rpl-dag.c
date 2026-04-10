@@ -185,12 +185,30 @@ find_objective_function(rpl_ocp_t ocp)
   return NULL;
 }
 /*---------------------------------------------------------------------------*/
+static clock_time_t last_root_dtsn_update = 0;
+/*---------------------------------------------------------------------------*/
+void
+rpl_dag_note_root_dtsn_update(const char *reason)
+{
+  if(rpl_dag_root_is_root()) {
+    last_root_dtsn_update = clock_time();
+    LOG_INFO("root DTSN update noted (%s)\n", reason);
+  }
+}
+/*---------------------------------------------------------------------------*/
+clock_time_t
+rpl_dag_last_root_dtsn_update(void)
+{
+  return last_root_dtsn_update;
+}
+/*---------------------------------------------------------------------------*/
 void
 rpl_refresh_routes(const char *str)
 {
   if(rpl_dag_root_is_root()) {
     /* Increment DTSN */
     RPL_LOLLIPOP_INCREMENT(curr_instance.dtsn_out);
+    rpl_dag_note_root_dtsn_update("refresh routes");
 
     LOG_WARN("incremented DTSN (%s), current %u\n",
          str, curr_instance.dtsn_out);
@@ -206,6 +224,7 @@ rpl_global_repair(const char *str)
   if(rpl_dag_root_is_root()) {
     RPL_LOLLIPOP_INCREMENT(curr_instance.dag.version);  /* New DAG version */
     curr_instance.dtsn_out = RPL_LOLLIPOP_INIT;  /* Re-initialize DTSN */
+    rpl_dag_note_root_dtsn_update("global repair");
 
     LOG_WARN("initiating global repair (%s), version %u, rank %u\n",
          str, curr_instance.dag.version, curr_instance.dag.rank);
@@ -599,6 +618,13 @@ process_dio_init_dag(rpl_dio_t *dio)
 void
 rpl_process_dio(uip_ipaddr_t *from, rpl_dio_t *dio)
 {
+#ifdef RPL_VALIDATE_DIO_FUNC
+  if(!RPL_VALIDATE_DIO_FUNC(dio)) {
+    LOG_WARN("DIO validation failed, ignoring from all paths\n");
+    return;
+  }
+#endif /* RPL_VALIDATE_DIO_FUNC */
+
   if(!curr_instance.used && !rpl_dag_root_is_root()) {
     /* Attempt to init our DAG from this DIO */
     if(!process_dio_init_dag(dio)) {

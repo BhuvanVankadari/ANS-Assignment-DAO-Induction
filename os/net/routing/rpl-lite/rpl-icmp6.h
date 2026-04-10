@@ -87,6 +87,19 @@ typedef struct rpl_dao rpl_dao_t;
 /********** Public functions **********/
 
 /**
+ * Callback type invoked at the root whenever a DAO is accepted.
+ * \param from  The global IPv6 address of the DAO sender.
+ * \param seqno The DAO sequence number from the message.
+ */
+typedef void (*rpl_dao_input_callback_t)(const uip_ipaddr_t *from, uint8_t seqno);
+
+/**
+ * Registers a callback to be invoked on each accepted DAO at the root.
+ * Pass NULL to unregister.
+ */
+void rpl_icmp6_set_dao_callback(rpl_dao_input_callback_t cb);
+
+/**
  * Updates IPv6 neighbor cache on incoming link-local RPL ICMPv6 messages.
  *
  * \param from The source link-local IPv6 address

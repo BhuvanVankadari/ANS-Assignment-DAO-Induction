@@ -188,6 +188,17 @@ int rpl_dag_ready_to_advertise(void);
 void rpl_dag_update_state(void);
 
 /**
+ * Notes that the root has legitimately changed DTSN (e.g., route refresh).
+ * Used by root-side DAO induction detection logic.
+ */
+void rpl_dag_note_root_dtsn_update(const char *reason);
+
+/**
+ * Returns timestamp of last legitimate root DTSN update.
+ */
+clock_time_t rpl_dag_last_root_dtsn_update(void);
+
+/**
  * Initializes rpl-dag module
 */
 void rpl_dag_init(void);

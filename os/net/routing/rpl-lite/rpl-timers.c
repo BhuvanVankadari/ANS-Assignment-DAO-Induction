@@ -183,6 +183,7 @@ handle_dio_timer(void *ptr)
         if((count++ % RPL_TRICKLE_REFRESH_DAO_ROUTES) == 0) {
           /* Request new DAO to refresh route. */
           RPL_LOLLIPOP_INCREMENT(curr_instance.dtsn_out);
+          rpl_dag_note_root_dtsn_update("trickle refresh dao routes");
           LOG_INFO("trigger DAO updates with a DTSN increment (%u)\n", curr_instance.dtsn_out);
         }
       }
